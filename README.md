@@ -5,6 +5,7 @@ StegoCipher is a custom steganographic tool that hides secret messages inside sc
 ## 🚀 Features
 
 - **Quote-Based Cipher** - Hides your secret message inside a scrambled quote.
+- **Translation Obfuscation** - Automatically translate quotes to 14+ languages for extra security.
 - **Obfuscation Layer** - Adds random symbols and capitalization to make detection harder.
 - **Decrypt with Context** - Requires the original quote to decode the hidden message.
 - **Image Embedding (Optional)** - Embed encrypted messages into PNG images for stealth storage.
@@ -29,9 +30,9 @@ cd stego-cipher
 ```
 
 2. **Install dependencies**  
-This script optionally uses Pillow for image embedding:
+This script optionally uses Pillow for image embedding and googletrans for translation:
 ```bash
-pip install Pillow
+pip install Pillow pyperclip googletrans==4.0.0-rc1
 ```
 
 ## 🧪 Demo (No Setup Required)
@@ -39,7 +40,7 @@ pip install Pillow
 Just run:
 
 ```bash
-python3 stegocipher.py
+python3 stegoCipher.py
 ```
 
 Then choose option **3** from the menu:
@@ -50,7 +51,7 @@ You'll see how a quote hides a secret, and how to decrypt it back. Magic.
 
 ## 📜 CLI Options
 
-After running `python3 stegocipher.py`, you'll get a menu with:
+After running `python3 stegoCipher.py`, you'll get a menu with:
 
 | Option | Description | 
 | ---- | ----  |
@@ -68,10 +69,21 @@ After running `python3 stegocipher.py`, you'll get a menu with:
 
 ### Text Cipher
 
-- Scrambles each word from your quote
+- Takes an English quote from both sender and receiver
+- Optionally translates quote to another language (Spanish, French, German, etc.)
+- Scrambles each word from the translated quote
 - Inserts characters from your secret between scrambled words
 - Obfuscates with optional random symbols
 - Randomizes capitalization
+
+### Translation Obfuscation
+
+- Both Alice and Bob use the **same English quote**
+- Alice selects a language (e.g., Spanish) to translate before encrypting
+- Alice signals the language code to Bob (e.g., "use es")
+- Bob enters the same English quote and selects the same language
+- Translation happens automatically - no need to know the translated quote
+- Supports 14+ languages including non-Latin scripts: Spanish, French, German, Italian, Portuguese, Russian, Chinese, Japanese, Arabic, Hindi, Korean, Dutch, Polish, Swedish
 
 ### Image Steganography
 
@@ -83,9 +95,11 @@ After running `python3 stegocipher.py`, you'll get a menu with:
 
 - Python 3.6+
 - [Pillow](https://pypi.org/project/Pillow/) (for image features)
+- [pyperclip](https://pypi.org/project/pyperclip/) (for clipboard auto-copy)
+- [googletrans](https://pypi.org/project/googletrans/) (for translation obfuscation)
 
 ```bash
-pip install Pillow
+pip install Pillow pyperclip googletrans==4.0.0-rc1
 ```
 
 ## ⚠️ Important Notes
@@ -99,11 +113,12 @@ pip install Pillow
 Only someone who:
 
 1. Has the cipher text **and**
-2. Knows the original quote
+2. Knows the original English quote **and**
+3. Knows the language code used (if translation was applied)
 
 ... can decode the hidden message.
 
-This makes brute-forcing or accidental discovery highly unlikely if used correctly.
+This makes brute-forcing or accidental discovery highly unlikely if used correctly. With translation, even if someone guesses the cipher is quote-based, they won't know which language to try.
 
 ## 🧠 Behind the Scenes
 
