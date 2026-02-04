@@ -8,6 +8,7 @@ import random
 import re
 import sys
 import os
+import getpass
 from typing import List, Tuple
 
 # Image processing (install with: pip install Pillow)
@@ -16,6 +17,20 @@ try:
     IMAGE_SUPPORT = True
 except ImportError:
     IMAGE_SUPPORT = False
+
+# Clipboard support (install with: pip install pyperclip)
+try:
+    import pyperclip
+    CLIPBOARD_SUPPORT = True
+except ImportError:
+    CLIPBOARD_SUPPORT = False
+
+# Translation support (install with: pip install googletrans==4.0.0-rc1)
+try:
+    from googletrans import Translator, LANGUAGES
+    TRANSLATION_SUPPORT = True
+except ImportError:
+    TRANSLATION_SUPPORT = False
 
 
 class StegoCipher:
@@ -26,13 +41,37 @@ class StegoCipher:
     
     def __init__(self):
         self.symbols = "!@#$%^&*()_+-={}[]:;,./?<>~`"
+        self.translator = Translator() if TRANSLATION_SUPPORT else None
+        
+        # Popular languages for obfuscation
+        self.supported_languages = {
+            'es': 'Spanish',
+            'fr': 'French', 
+            'de': 'German',
+            'it': 'Italian',
+            'pt': 'Portuguese',
+            'ru': 'Russian',
+            'zh-cn': 'Chinese (Simplified)',
+            'ja': 'Japanese',
+            'ar': 'Arabic',
+            'hi': 'Hindi',
+            'ko': 'Korean',
+            'nl': 'Dutch',
+            'pl': 'Polish',
+            'sv': 'Swedish'
+        }
     
-    def encrypt(self, quote: str, secret: str, with_symbols: bool = True) -> str:
+    def encrypt(self, quote: str, secret: str, with_symbols: bool = True, translate_to: str = None) -> str:
         """Hide a secret message within a scrambled quote."""
         if not quote or not secret:
             raise ValueError("Both quote and secret message are required")
         
-        words = self._clean_quote(quote)
+        # Translate quote if language specified
+        working_quote = quote
+        if translate_to:
+            working_quote = self._translate_quote(quote, translate_to)
+        
+        words = self._clean_quote(working_quote)
         
         if len(secret) > len(words):
             raise ValueError(
@@ -61,9 +100,14 @@ class StegoCipher:
         cipher = ''.join(cipher_parts)
         return self._randomize_caps(cipher)
     
-    def decrypt(self, cipher: str, original_quote: str, with_symbols: bool = True) -> str:
+    def decrypt(self, cipher: str, original_quote: str, with_symbols: bool = True, translate_to: str = None) -> str:
         """Extract the hidden message from a cipher."""
-        words = self._clean_quote(original_quote)
+        # Translate quote if language specified
+        working_quote = original_quote
+        if translate_to:
+            working_quote = self._translate_quote(original_quote, translate_to)
+        
+        words = self._clean_quote(working_quote)
         word_lengths = [len(word) for word in words]
         
         # Clean the cipher
@@ -234,7 +278,8 @@ class StegoCipher:
         """Extract clean words from quote."""
         words = []
         for word in quote.lower().split():
-            clean_word = re.sub(r'[^a-z0-9]', '', word)
+            # Support Unicode letters and digits (for non-Latin scripts like Hindi, Chinese, etc.)
+            clean_word = re.sub(r'[^\w]', '', word, flags=re.UNICODE)
             if clean_word:
                 words.append(clean_word)
         return words
@@ -251,6 +296,20 @@ class StegoCipher:
             else:
                 result.append(char)
         return ''.join(result)
+    
+    def _translate_quote(self, quote: str, target_lang: str) -> str:
+        """Translate quote to target language for extra obfuscation."""
+        if not TRANSLATION_SUPPORT:
+            raise ImportError("googletrans is required for translation. Install with: pip install googletrans==4.0.0-rc1")
+        
+        if target_lang not in self.supported_languages:
+            raise ValueError(f"Unsupported language: {target_lang}")
+        
+        try:
+            translated = self.translator.translate(quote, dest=target_lang)
+            return translated.text
+        except Exception as e:
+            raise ValueError(f"Translation failed: {e}")
 
 
 def main():
@@ -262,6 +321,12 @@ def main():
     
     if not IMAGE_SUPPORT:
         print("⚠️  Image features disabled. Install Pillow with: pip install Pillow")
+    
+    if not CLIPBOARD_SUPPORT:
+        print("⚠️  Clipboard auto-copy disabled. Install with: pip install pyperclip")
+    
+    if not TRANSLATION_SUPPORT:
+        print("⚠️  Translation features disabled. Install with: pip install googletrans==4.0.0-rc1")
     
     while True:
         print("\nChoose an option:")
@@ -303,12 +368,12 @@ def encrypt_message(cipher):
     print("\n📝 ENCRYPT A MESSAGE")
     print("-" * 20)
     
-    quote = input("Enter cover quote: ").strip()
+    quote = input("Enter cover quote (in English): ").strip()
     if not quote:
         print("❌ Quote cannot be empty!")
         return
     
-    secret = input("Enter secret message: ").strip()
+    secret = getpass.getpass("Enter secret message (hidden): ").strip()
     if not secret:
         print("❌ Secret message cannot be empty!")
         return
@@ -316,15 +381,40 @@ def encrypt_message(cipher):
     symbols = input("Use random symbols for extra obfuscation? (y/n): ").strip().lower()
     use_symbols = symbols in ['y', 'yes']
     
+    # Translation option
+    translate_lang = None
+    if TRANSLATION_SUPPORT:
+        use_translation = input("Translate quote to another language for extra obfuscation? (y/n): ").strip().lower()
+        if use_translation in ['y', 'yes']:
+            print("\n🌍 Available languages:")
+            for code, name in cipher.supported_languages.items():
+                print(f"   {code:8} - {name}")
+            translate_lang = input("\nEnter language code (e.g., es, fr, de): ").strip().lower()
+            if translate_lang and translate_lang not in cipher.supported_languages:
+                print(f"⚠️  Unknown language code. Proceeding without translation.")
+                translate_lang = None
+    
     try:
-        encrypted = cipher.encrypt(quote, secret, with_symbols=use_symbols)
+        encrypted = cipher.encrypt(quote, secret, with_symbols=use_symbols, translate_to=translate_lang)
         
         print(f"\n✅ SUCCESS!")
         print(f"📄 Original quote: {quote}")
-        print(f"🔒 Secret message: {secret}")
+        if translate_lang:
+            print(f"🌍 Language used: {cipher.supported_languages[translate_lang]}")
         print(f"🎭 Encrypted cipher:")
         print(f"    {encrypted}")
+        
+        # Auto-copy to clipboard if available
+        if CLIPBOARD_SUPPORT:
+            try:
+                pyperclip.copy(encrypted)
+                print(f"\n📋 Encrypted text copied to clipboard!")
+            except Exception as e:
+                print(f"\n⚠️  Could not copy to clipboard: {e}")
+        
         print(f"\n💡 Share the encrypted text above. Keep the original quote secret!")
+        if translate_lang:
+            print(f"💡 Signal to recipient: Use language '{translate_lang}' ({cipher.supported_languages[translate_lang]})")
         
     except ValueError as e:
         print(f"❌ Error: {e}")
@@ -340,7 +430,7 @@ def decrypt_message(cipher):
         print("❌ Encrypted text cannot be empty!")
         return
     
-    quote = input("Enter original quote: ").strip()
+    quote = input("Enter original quote (in English): ").strip()
     if not quote:
         print("❌ Original quote cannot be empty!")
         return
@@ -348,8 +438,21 @@ def decrypt_message(cipher):
     symbols = input("Were symbols used during encryption? (y/n): ").strip().lower()
     used_symbols = symbols in ['y', 'yes']
     
+    # Translation option
+    translate_lang = None
+    if TRANSLATION_SUPPORT:
+        use_translation = input("Was a translation used during encryption? (y/n): ").strip().lower()
+        if use_translation in ['y', 'yes']:
+            print("\n🌍 Available languages:")
+            for code, name in cipher.supported_languages.items():
+                print(f"   {code:8} - {name}")
+            translate_lang = input("\nEnter language code used (e.g., es, fr, de): ").strip().lower()
+            if translate_lang and translate_lang not in cipher.supported_languages:
+                print(f"⚠️  Unknown language code. Proceeding without translation.")
+                translate_lang = None
+    
     try:
-        decrypted = cipher.decrypt(encrypted, quote, with_symbols=used_symbols)
+        decrypted = cipher.decrypt(encrypted, quote, with_symbols=used_symbols, translate_to=translate_lang)
         print(f"\n✅ SUCCESS!")
         print(f"🔓 Decrypted message: {decrypted}")
         
@@ -445,7 +548,7 @@ def show_demo(cipher):
     print("-" * 25)
     
     quote = "The quick brown fox jumps over the lazy dog"
-    secret = "hello world"
+    secret = "hi there"
     
     print(f"📄 Cover Quote: {quote}")
     print(f"🔒 Secret Message: {secret}")
@@ -470,6 +573,13 @@ def show_demo(cipher):
     print(f"   • Random symbols and capitalization add camouflage")
     print(f"   • Only someone with the original quote can decode it!")
     
+    if TRANSLATION_SUPPORT:
+        print(f"\n🌍 Translation Obfuscation:")
+        print(f"   • Translate quote to another language for extra security")
+        print(f"   • Both sender and receiver use the ENGLISH quote")
+        print(f"   • Language code is signaled separately (e.g., 'use es')")
+        print(f"   • Same quote, different languages = different ciphers!")
+    
     if IMAGE_SUPPORT:
         print(f"\n🖼️  Image Steganography:")
         print(f"   • Hide the encrypted cipher inside any image file")
@@ -480,4 +590,8 @@ def show_demo(cipher):
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except KeyboardInterrupt:
+        print("\n\n👋 Exiting... Stay secure!")
+        sys.exit(0)
